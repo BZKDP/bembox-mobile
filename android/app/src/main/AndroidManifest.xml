@@ -1,0 +1,134 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <uses-permission
+        android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission
+        android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <uses-permission
+        android:name="android.permission.INTERNET"/>
+    <uses-permission
+        android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <!-- Показ пуш-уведомлений (обязательно с Android 13+) -->
+    <uses-permission
+        android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- Foreground-service для живого несмахиваемого статуса заказа -->
+    <uses-permission
+        android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission
+        android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
+    <!-- Камера + фото QR/штрих-кода на экране ПВЗ (file input capture) -->
+    <uses-permission
+        android:name="android.permission.CAMERA"/>
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false"/>
+    <!-- Микрофон: голосовой ввод в консьерже/ассистенте (getUserMedia в WebView) -->
+    <uses-permission
+        android:name="android.permission.RECORD_AUDIO"/>
+    <uses-permission
+        android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
+    <uses-feature
+        android:name="android.hardware.microphone"
+        android:required="false"/>
+    <application
+        android:label="bembox"
+        android:name="${applicationName}"
+        android:icon="@mipmap/ic_launcher">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:taskAffinity=""
+            android:theme="@style/LaunchTheme"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize">
+            <!-- Specifies an Android theme to apply to this Activity as soon as
+                 the Android process has started. This theme is visible to the user
+                 while the Flutter UI initializes. After that, this theme continues
+                 to determine the Window background behind the Flutter UI. -->
+            <meta-data
+                android:name="io.flutter.embedding.android.NormalTheme"
+                android:resource="@style/NormalTheme"/>
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+        <!-- RuStore Push: Project ID подставляется из build.gradle.kts по типу
+             сборки (debug → проект с debug-SHA, release → проект с release-SHA),
+             т.к. RuStore допускает один отпечаток на проект. -->
+        <meta-data
+            android:name="ru.rustore.sdk.pushclient.project_id"
+            android:value="${rustorePushProjectId}"/>
+        <!-- Наш messaging-сервис RuStore: строит живое уведомление статуса заказа
+             нативно + переадресует остальные сообщения в плагин. Заменяет сервис
+             плагина (его удаляем ниже), т.к. на один MESSAGING_EVENT — один сервис. -->
+        <service
+            android:name=".BemboxPushService"
+            android:exported="true"
+            tools:ignore="ExportedService">
+            <intent-filter>
+                <action
+                    android:name="ru.rustore.sdk.pushclient.MESSAGING_EVENT"/>
+            </intent-filter>
+        </service>
+        <service
+            android:name="ru.rustore.flutter_rustore_push.FlutterRustorePushService"
+            tools:node="remove"/>
+        <!-- Foreground-service живого статуса заказа (полностью цветное,
+             несмахиваемое уведомление с прогрессом). -->
+        <service
+            android:name=".OrderTrackingService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="live_order_tracking"/>
+        </service>
+        <!-- Don't delete the meta-data below.
+             This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
+        <meta-data
+            android:name="flutterEmbedding"
+            android:value="2"/>
+    </application>
+    <!-- Required to query activities that can process text, see:
+         https://developer.android.com/training/package-visibility and
+         https://developer.android.com/reference/android/content/Intent#ACTION_PROCESS_TEXT.
+
+         In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
+    <queries>
+        <intent>
+            <action
+                android:name="android.intent.action.PROCESS_TEXT"/>
+            <data
+                android:mimeType="text/plain"/>
+        </intent>
+        <!-- Внешние ссылки из WebView: системный браузер (https), звонилка (tel),
+             почта (mailto), SMS — нужно объявить для url_launcher на Android 11+. -->
+        <intent>
+            <action
+                android:name="android.intent.action.VIEW"/>
+            <data
+                android:scheme="https"/>
+        </intent>
+        <intent>
+            <action
+                android:name="android.intent.action.DIAL"/>
+            <data
+                android:scheme="tel"/>
+        </intent>
+        <intent>
+            <action
+                android:name="android.intent.action.SENDTO"/>
+            <data
+                android:scheme="mailto"/>
+        </intent>
+        <intent>
+            <action
+                android:name="android.intent.action.VIEW"/>
+            <data
+                android:scheme="sms"/>
+        </intent>
+    </queries>
+</manifest>

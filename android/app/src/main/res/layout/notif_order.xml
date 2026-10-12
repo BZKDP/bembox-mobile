@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="#FFFF7547"
+    android:paddingLeft="16dp"
+    android:paddingRight="16dp"
+    android:paddingTop="14dp"
+    android:paddingBottom="16dp">
+
+    <TextView
+        android:id="@+id/bem_label"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="bembox · доставка"
+        android:textColor="#CCFFFFFF"
+        android:textSize="12sp"
+        android:letterSpacing="0.02" />
+
+    <TextView
+        android:id="@+id/bem_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="3dp"
+        android:textColor="#FFFFFFFF"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:maxLines="1"
+        android:ellipsize="end" />
+
+    <TextView
+        android:id="@+id/bem_status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="3dp"
+        android:textColor="#FFFFFFFF"
+        android:textSize="14sp"
+        android:maxLines="2"
+        android:ellipsize="end" />
+
+    <ImageView
+        android:id="@+id/bem_track"
+        android:layout_width="match_parent"
+        android:layout_height="34dp"
+        android:layout_marginTop="12dp"
+        android:scaleType="fitXY"
+        android:contentDescription="@null" />
+
+</LinearLayout>

@@ -1,0 +1,44 @@
+name: iOS build
+
+# Первая цель — убедиться, что приложение КОМПИЛИТСЯ под iOS (поды/плагины),
+# без подписи. Подпись и TestFlight добавим следующим шагом (нужен ASC API key).
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-ios:
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter version
+        run: flutter --version
+
+      - name: Pub get
+        run: flutter pub get
+
+      - name: Build iOS (unsigned)
+        run: flutter build ios --release --no-codesign
+
+      - name: Zip .app
+        run: |
+          cd build/ios/iphoneos
+          zip -r Runner.app.zip Runner.app
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-unsigned-app
+          path: build/ios/iphoneos/Runner.app.zip
+          if-no-files-found: error

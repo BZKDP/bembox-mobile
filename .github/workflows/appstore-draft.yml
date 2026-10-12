@@ -1,0 +1,36 @@
+name: App Store draft (metadata + screenshots)
+
+# Заливает метаданные и скриншоты в App Store Connect КАК ЧЕРНОВИК (без отправки
+# на ревью). Бинарь уже в TestFlight. Запуск вручную. macOS не нужен — deliver
+# работает по App Store Connect API на обычном ubuntu (бесплатные минуты).
+
+on:
+  workflow_dispatch:
+
+jobs:
+  draft:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_KEY_PATH: ${{ github.workspace }}/ios/private_keys/AuthKey.p8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Write ASC API key file
+        run: |
+          mkdir -p "${{ github.workspace }}/ios/private_keys"
+          printf '%s' "${{ secrets.ASC_API_KEY_P8 }}" > "$ASC_KEY_PATH"
+
+      - name: Setup Ruby + Fastlane
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+          working-directory: ios
+
+      - name: Fastlane draft → App Store Connect
+        working-directory: ios
+        run: bundle exec fastlane draft

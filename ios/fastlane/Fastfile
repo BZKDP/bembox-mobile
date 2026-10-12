@@ -1,0 +1,91 @@
+default_platform(:ios)
+
+APP_ID = "com.evgeniishvydchenko.bembox"
+
+platform :ios do
+  desc "Сборка подписанного IPA и заливка в TestFlight (match appstore + ASC API key)"
+  lane :beta do
+    setup_ci
+
+    api_key = app_store_connect_api_key(
+      key_id: ENV["ASC_KEY_ID"],
+      issuer_id: ENV["ASC_ISSUER_ID"],
+      key_filepath: ENV["ASC_KEY_PATH"],
+      in_house: false
+    )
+
+    # Distribution-сертификат + App Store provisioning profile через API-ключ.
+    # type:appstore => профиль распространения (устройства НЕ нужны, в отличие от
+    # development-профиля автоподписи). App ID уже зарегистрирован, поэтому match
+    # находит идентификатор и создаёт профиль. Сертификаты хранит зашифрованно в
+    # ветке match-certs этого же репо (переиспользует на повторных прогонах).
+    match(
+      type: "appstore",
+      api_key: api_key,
+      app_identifier: APP_ID,
+      git_url: ENV["MATCH_GIT_URL"],
+      git_branch: "match-certs",
+      readonly: false,
+      platform: "ios"
+    )
+
+    profile_name = ENV["sigh_#{APP_ID}_appstore_profile-name"] || "match AppStore #{APP_ID}"
+
+    increment_build_number(
+      xcodeproj: "Runner.xcodeproj",
+      build_number: ENV["BUILD_NUMBER"] || "1"
+    )
+
+    update_code_signing_settings(
+      path: "Runner.xcodeproj",
+      use_automatic_signing: false,
+      team_id: ENV["IOS_TEAM_ID"],
+      code_sign_identity: "Apple Distribution",
+      profile_name: profile_name,
+      bundle_identifier: APP_ID,
+      targets: ["Runner"]
+    )
+
+    build_app(
+      workspace: "Runner.xcworkspace",
+      scheme: "Runner",
+      export_method: "app-store",
+      export_options: {
+        signingStyle: "manual",
+        teamID: ENV["IOS_TEAM_ID"],
+        provisioningProfiles: {
+          APP_ID => profile_name
+        }
+      }
+    )
+
+    upload_to_testflight(
+      api_key: api_key,
+      skip_waiting_for_build_processing: true
+    )
+  end
+
+  desc "Залить метаданные + скриншоты в App Store Connect КАК ЧЕРНОВИК (без отправки на ревью)"
+  lane :draft do
+    api_key = app_store_connect_api_key(
+      key_id: ENV["ASC_KEY_ID"],
+      issuer_id: ENV["ASC_ISSUER_ID"],
+      key_filepath: ENV["ASC_KEY_PATH"],
+      in_house: false
+    )
+
+    deliver(
+      api_key: api_key,
+      app_identifier: APP_ID,
+      app_version: "1.0.4",
+      skip_binary_upload: true,        # бинарь уже в TestFlight — не трогаем
+      skip_metadata: false,
+      skip_screenshots: false,
+      overwrite_screenshots: true,
+      submit_for_review: false,        # ЧЕРНОВИК — владелец отправит сам
+      automatic_release: false,
+      run_precheck_before_submit: false,
+      force: true                      # без интерактивного подтверждения (CI)
+    )
+  end
+end

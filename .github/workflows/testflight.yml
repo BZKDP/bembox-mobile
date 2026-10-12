@@ -1,0 +1,77 @@
+name: iOS TestFlight
+
+# Запуск вручную (Actions → iOS TestFlight → Run workflow).
+# Подпись: Xcode automatic signing через App Store Connect API key
+# (-allowProvisioningUpdates) — Xcode сам регистрирует App ID, создаёт
+# сертификат и профиль. match не используется.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write   # match хранит сертификаты в ветке match-certs этого репо
+
+jobs:
+  testflight:
+    # macos-26 = образ с Xcode 26 / iOS 26 SDK (Apple требует iOS 26 SDK для заливки).
+    runs-on: macos-26
+    timeout-minutes: 60
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+      ASC_KEY_PATH: ${{ github.workspace }}/ios/private_keys/AuthKey.p8
+      MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+      MATCH_GIT_URL: https://github.com/Graflabit/bembox-mobile.git
+      BUILD_NUMBER: ${{ github.run_number }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select newest Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Show Xcode / SDK
+        run: |
+          xcodebuild -version
+          xcodebuild -showsdks | grep -i iphoneos || true
+
+      - name: Git auth for match (push certs branch)
+        run: git config --global url."https://x-access-token:${{ github.token }}@github.com/".insteadOf "https://github.com/"
+
+      - name: Write ASC API key file
+        run: |
+          mkdir -p "${{ github.workspace }}/ios/private_keys"
+          printf '%s' "${{ secrets.ASC_API_KEY_P8 }}" > "$ASC_KEY_PATH"
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      # Собираем iOS через CocoaPods, а НЕ Swift Package Manager: в SPM-режиме
+      # firebase_messaging тянет GoogleAppMeasurement/GoogleAdsOnDeviceConversion
+      # (рекламный IDFA → App Store требует объявить трекинг). CocoaPods-под
+      # FirebaseMessaging этот модуль не подключает → IDFA в бинаре нет.
+      - name: Use CocoaPods (disable Swift Package Manager)
+        run: flutter config --no-enable-swift-package-manager
+
+      - name: Pub get
+        run: flutter pub get
+
+      - name: Prepare iOS (pods + xcconfig)
+        run: flutter build ios --release --no-codesign
+
+      - name: Setup Ruby + Fastlane
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+          working-directory: ios
+
+      - name: Fastlane beta → TestFlight
+        working-directory: ios
+        run: bundle exec fastlane beta
